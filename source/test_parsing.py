@@ -1,6 +1,5 @@
 import pandas
 import math
-import numpy as np
 
 
 INPUT_FILE_PATH = r"../data/out_field_players.csv"
