@@ -71,8 +71,9 @@ def process_wage(df):
 
 def process_value(df):
     df['Value'] = df['Value'].map(lambda x: parse_values(x))
-    values_vector = df['Value'].values
-    return values_vector
+    values_vector = df['Value']
+    values_vector.to_csv("../data/value.csv", index=False)
+
 
 
 def parse_values(value):
@@ -299,7 +300,7 @@ def is_loaned_from(loaned_club):
 def remove_columns(df):
     df = df.drop(columns=["ID", "Name", "Photo", "Flag", "Club Logo", "Special", "Body Type", "Release Clause", "Club",
                           "Unnamed: 0", "Unnamed: 0.1", "Nationality", "Work Rate", "GKDiving", "GKHandling",
-                          "GKPositioning", "GKReflexes"])
+                          "GKPositioning", "GKReflexes", "Value"])
     return df
 
 
