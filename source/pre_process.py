@@ -52,11 +52,14 @@ def pre_process():
     # Remove players with market value equal to 0
     df = remove_zero_values(df)
 
-    # Remove ID, Name, Photo, Flag, ClubLogo, Special, BodyType, Release Clause
-    df = remove_columns(df)
+    # Replace the club name with the average overall score for the players in the club
+    df = process_club(df)
 
     # Make loaned from binary, 1 if a player is on loan, 0 otherwise
     df = process_loaned_from(df)
+
+    # Remove ID, Name, Photo, Flag, ClubLogo, Special, BodyType, Release Clause
+    df = remove_columns(df)
 
     return df
 
@@ -219,7 +222,10 @@ def make_work_rate_integer(work_rate):
 
 
 def process_joined(df):
+    df = df.dropna(subset=["Contract Valid Until"])
     df['Joined'] = df['Joined'].map(lambda x: get_joined_year(x))
+    df["Joined"] = df.apply(lambda x: _process_joined_auxiliary(x), axis=1)
+
     return df
 
 
@@ -229,6 +235,17 @@ def get_joined_year(joined_date):
         date = joined_date_split[0]
         year = joined_date_split[1]
         return year
+    else:
+        return joined_date
+
+def _process_joined_auxiliary(row):
+    if str(row["Joined"]) == "nan":
+        print("here")
+        new_year = str(int(row["Contract Valid Until"]) - 3)
+        return new_year
+    else:
+        return row["Joined"]
+
 
 
 
@@ -253,21 +270,57 @@ def remove_zero_values(df):
 
 def process_loaned_from(df):
     df['Is_Loaned'] = df['Loaned From'].map(lambda x: is_loaned_from(x))
+    df["Loaned_From_Overall"] = df.apply(lambda x: _process_loaned_from_auxiliary(x, df), axis=1)
     return df
 
 
+def _process_loaned_from_auxiliary(row, df):
+    # Loaned from is nan, replace with current clubs overall
+    if not row["Is_Loaned"]:
+        return row["Club_Overall"]
+
+    # Find the loaned from club's overall rating and return it
+    for i, search_row in df[["Club", "Club_Overall"]].drop_duplicates().iterrows():
+        if search_row["Club"] == row["Loaned From"]:
+            return search_row["Club_Overall"]
+
+    return row["Club_Overall"]
+
+
+
+
 def is_loaned_from(loaned_club):
-    if str(loaned_club) == "nan":   # Player is not on load
+    if str(loaned_club) == "nan":   # Player is not on loan
         return 0
     else:
         return 1
 
 
 def remove_columns(df):
-    df = df.drop(columns=["ID", "Name", "Photo", "Flag", "Club Logo", "Special", "Body Type", "Release Clause"])
+    df = df.drop(columns=["ID", "Name", "Photo", "Flag", "Club Logo", "Special", "Body Type", "Release Clause", "Club",
+                          "Unnamed: 0", "Unnamed: 0.1", "Nationality", "Work Rate", "GKDiving", "GKHandling",
+                          "GKPositioning", "GKReflexes"])
     return df
+
+
+def process_club(df):
+    reduced_df = df[["Club", "Overall"]]
+    club_means = reduced_df.groupby('Club', as_index=False).mean()
+    df["Club_Overall"] = df.apply(lambda x: _process_club_auxiliary(x, club_means), axis=1)
+    return df
+
+
+def _process_club_auxiliary(row, club_means):
+    if row["Club"] == "nan":
+        return row["Overall"]
+    else:
+        club_mean_row = club_means.loc[club_means['Club'] == row["Club"]]
+        result = float(club_mean_row["Overall"].values)  # Convert to single value
+        return result
+
+
 
 
 if __name__ == '__main__':
     df = pre_process()
-    df.to_csv(PROCESSED_OUTPUT_FILE_PATH)
+    df.to_csv(PROCESSED_OUTPUT_FILE_PATH, index=False)
