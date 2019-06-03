@@ -1,5 +1,6 @@
 import pandas
 import math
+import numpy as np
 
 
 INPUT_FILE_PATH = r"../data/out_field_players.csv"
@@ -19,7 +20,7 @@ def pre_process():
     df = process_wage(df)
 
     # Parse value
-    vector_values = process_value(df)
+    #vector_values = process_value(df)
 
     # Convert height to meter
     df = convert_height(df)
@@ -60,6 +61,9 @@ def pre_process():
 
     # Remove ID, Name, Photo, Flag, ClubLogo, Special, BodyType, Release Clause
     df = remove_columns(df)
+
+    # Normalize the data by subtracting the mean and dividing by the standard deviation
+    df = normalize(df)
 
     return df
 
@@ -158,7 +162,8 @@ def parse_add_position(position):
 
 
 def process_loaned_players(df):
-    df['Contract Valid Until'] = df['Contract Valid Until'].map(lambda x: remove_date(x))
+    df = df.dropna(subset=["Contract Valid Until"])
+    df['Contract Valid Until'] = df['Contract Valid Until'].map(lambda x: remove_date(x)).astype(int)
     return df
 
 
@@ -223,9 +228,9 @@ def make_work_rate_integer(work_rate):
 
 
 def process_joined(df):
-    df = df.dropna(subset=["Contract Valid Until"])
     df['Joined'] = df['Joined'].map(lambda x: get_joined_year(x))
     df["Joined"] = df.apply(lambda x: _process_joined_auxiliary(x), axis=1)
+    df["Joined"] = df["Joined"].astype(int)
 
     return df
 
@@ -241,7 +246,6 @@ def get_joined_year(joined_date):
 
 def _process_joined_auxiliary(row):
     if str(row["Joined"]) == "nan":
-        print("here")
         new_year = str(int(row["Contract Valid Until"]) - 3)
         return new_year
     else:
@@ -300,7 +304,7 @@ def is_loaned_from(loaned_club):
 def remove_columns(df):
     df = df.drop(columns=["ID", "Name", "Photo", "Flag", "Club Logo", "Special", "Body Type", "Release Clause", "Club",
                           "Unnamed: 0", "Unnamed: 0.1", "Nationality", "Work Rate", "GKDiving", "GKHandling",
-                          "GKPositioning", "GKReflexes", "Value"])
+                          "GKPositioning", "GKReflexes", "Value", "Position", "Loaned From"])
     return df
 
 
@@ -319,6 +323,16 @@ def _process_club_auxiliary(row, club_means):
         result = float(club_mean_row["Overall"].values)  # Convert to single value
         return result
 
+
+def normalize(df):
+    # Normalize every column
+    for key in df.keys():
+        column = df[key]
+        standard_deviation = np.std(column)
+        mean = np.mean(column)
+        df[key] = column.apply(lambda val: (val - mean)/standard_deviation)
+
+    return df
 
 
 
